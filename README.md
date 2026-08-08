@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/BrethrenPatch_Logo.png" style="max-width:70%">
+</p>
+
 # Brethren Patch
 
 Fixes for the PC port of Dead Space 3, in the spirit of the
@@ -64,15 +68,17 @@ pool it feeds is allocated dynamically. Capping also costs throughput, since the
 pool is sized from the processor count. Enable it only if a many-core machine
 actually crashes.
 
-## Installing
+### How to Install
 
-Take `BrethrenPatch.asi` from a release, or build it yourself as described below.
+Compatible with all versions of Dead Space 3 (Steam, EA App).
 
-1. Put an ASI loader in the game folder, for example
-   [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)
-   renamed to `winmm.dll`.
-2. Copy `BrethrenPatch.asi` into `plugins\`.
-3. Copy `BrethrenPatch.ini` next to `deadspace3.exe`.
+**Download**: [BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch.zip)  
+Extract the contents of the zip file into the game's folder, in the same directory as the `deadspace3.exe` file.
+
+Or build it yourself as described below.
+
+If the game doesn't start on Windows after installing the patch, try updating to the latest Microsoft Visual C++ Redistributable (x86).  
+You can download it here: https://aka.ms/vs/17/release/vc_redist.x86.exe
 
 `BrethrenPatch.log` is written next to the executable and lists every signature
 that matched, so a failed scan is visible rather than silent.
@@ -85,6 +91,9 @@ hooks here change that section, so it locks its bindings and drops into a safe
 overlay. Set `HavokPhysicsFix=0`, `VSyncRefreshRateFix=0` and `UiScaling=0` to
 leave the code section untouched when you need the Debug Menu.
 
+### Configuration
+
+All features can be customized via the `BrethrenPatch.ini` file. Every feature is explained there and can be adjusted.
 ## Building
 
 Visual Studio 2022 with the x86 toolchain, then `build.bat`. Adjust the
@@ -100,6 +109,10 @@ which bundles Zydis (MIT). See `THIRD-PARTY-NOTICES.md`.
 Addresses are absolute VAs for the build listed above. If a future patch moves
 them, the byte patterns in `src/` should still find them; the log will say which
 one did not match.
+
+## Credits
+- [safetyhook](https://github.com/cursey/safetyhook) for hooking.  
+- [mINI](https://github.com/metayeti/mINI) for INI file handling.  
 
 ## Licence
 
