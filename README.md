@@ -12,7 +12,7 @@ patches do not transfer, so the addresses here were found from scratch.
 
 Tested against the Steam build.
 
-## Fixes
+### Fixes
 
 ## VSync no longer locks the game to 30 FPS
 
