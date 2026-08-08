@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/BrethrenPatch_Logo.png" style="max-width:70%">
+  <img src="assets/BrethrenPatch_Logo.png" alt="Brethren Patch" width="70%">
 </p>
 
 # Brethren Patch
