@@ -12,7 +12,7 @@ patches do not transfer, so the addresses here were found from scratch.
 
 Tested against the Steam build.
 
-## Fixes
+# Fixes
 
 ## VSync no longer locks the game to 30 FPS
 
@@ -76,13 +76,6 @@ leave the code section untouched when you need the Debug Menu.
 ## Configuration
 
 All features can be customized in the `BrethrenPatch.ini` file. Every feature is explained there and can be adjusted.
-## Building
-
-## Building
-
-Visual Studio 2022 with the x86 toolchain, then `build.bat`. Adjust the
-`vcvars32.bat` path in the script if your install differs. safetyhook needs
-`std::expected`, hence `/std:c++latest`.
 
 ## What still needs to be fixed or looked-into at higher resolutinos
 - Soft shadow blur fix
@@ -94,6 +87,12 @@ Visual Studio 2022 with the x86 toolchain, then `build.bat`. Adjust the
 - Entity Persistence
 - Skip Intro if possible
 - Auto Resolution
+
+## Building
+
+Visual Studio 2022 with the x86 toolchain, then `build.bat`. Adjust the
+`vcvars32.bat` path in the script if your install differs. safetyhook needs
+`std::expected`, hence `/std:c++latest`.
 
 ## Notes
 
