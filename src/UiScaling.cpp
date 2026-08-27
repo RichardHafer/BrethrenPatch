@@ -13,7 +13,7 @@
 // normalising against the real resolution keeps its pixel size. Text takes the
 // second path.
 //
-// ref is a pointer, not a flag - the other caller passes an object address - so
+// ref is a pointer, not a flag, and the other caller passes an object address, so
 // it cannot simply be forced non-zero. Instead the original runs untouched and
 // only the two scale factors are corrected afterwards.
 //
@@ -30,8 +30,29 @@ static const unsigned kScaleX = 0x28;
 static const unsigned kScaleY = 0x2C;
 static const float kReferenceHeight = 720.0f;
 
-static const unsigned short* gScreenWidth = nullptr;
-static const unsigned short* gScreenHeight = nullptr;
+// SetDrawReference holds the only convenient reference to the screen dimension
+// globals, so this is where they are picked up. The depth of field fix needs them
+// too, hence the shared State rather than a local.
+void ResolveScreenSize()
+{
+    if (g.screenWidth)
+        return;
+
+    const DWORD address = Find("55 8B EC 8B 45 08 39 41 58 74 49 89 41 58 85 C0", "SetDrawReference");
+    if (!address)
+        return;
+
+    // Read out of the function's own else branch:
+    //   +0x28  0F B7 15 <width>
+    //   +0x32  66 A1    <height>
+    const unsigned char* code = (const unsigned char*)address;
+    if (code[0x28] == 0x0F && code[0x29] == 0xB7 && code[0x2A] == 0x15 &&
+        code[0x32] == 0x66 && code[0x33] == 0xA1)
+    {
+        g.screenWidth = *(const unsigned short**)(address + 0x2B);
+        g.screenHeight = *(const unsigned short**)(address + 0x34);
+    }
+}
 
 static void __fastcall SetDrawReference_Hook(void* self, int, unsigned ref)
 {
@@ -41,10 +62,9 @@ static void __fastcall SetDrawReference_Hook(void* self, int, unsigned ref)
         return;
 
     float referenceWidth = 1280.0f;
-    if (gScreenWidth && gScreenHeight)
     {
-        const unsigned short w = *gScreenWidth;
-        const unsigned short h = *gScreenHeight;
+        const int w = g.Width();
+        const int h = g.Height();
         if (w && h)
             referenceWidth = kReferenceHeight * (float)w / (float)h;
     }
@@ -71,22 +91,9 @@ void ApplyUiScaling()
     if (!address)
         return;
 
-    // Screen dimensions come out of the function's own else branch:
-    //   +0x28  0F B7 15 <width>
-    //   +0x32  66 A1    <height>
-    const unsigned char* code = (const unsigned char*)address;
-    if (code[0x28] == 0x0F && code[0x29] == 0xB7 && code[0x2A] == 0x15 &&
-        code[0x32] == 0x66 && code[0x33] == 0xA1)
-    {
-        gScreenWidth = *(const unsigned short**)(address + 0x2B);
-        gScreenHeight = *(const unsigned short**)(address + 0x34);
-    }
-    else
-    {
+    if (!g.screenWidth)
         Log("UiScaling: screen dimensions not found, falling back to a fixed 1280");
-    }
 
     gSetDrawReference = Hook((void*)address, &SetDrawReference_Hook);
-    Log("UiScaling: active (scale %.2f, screen %ux%u)", cfg::uiScale,
-        gScreenWidth ? *gScreenWidth : 0, gScreenHeight ? *gScreenHeight : 0);
+    Log("UiScaling: active (scale %.2f)", cfg::uiScale);
 }

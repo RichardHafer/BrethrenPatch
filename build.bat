@@ -14,14 +14,16 @@ if not exist obj mkdir obj
 rem safetyhook needs std::expected, hence c++latest.
 cl /nologo /c /O2 /EHsc /std:c++latest /MT /DNDEBUG /Iinclude ^
    src\dllmain.cpp src\HavokPhysics.cpp src\HighCoreCpu.cpp ^
-   src\VSyncRefreshRate.cpp src\UiScaling.cpp ^
+   src\VSyncRefreshRate.cpp src\UiScaling.cpp src\DepthOfField.cpp src\Diagnostics.cpp ^
+   src\ClassicCoop.cpp src\SkipAttractVideo.cpp src\SkipStartupLogos.cpp src\WindowsVolume.cpp src\EnemySpawnScaling.cpp src\EnemyDifficulty.cpp ^
+   src\CheckpointGuard.cpp ^
    include\safetyhook\safetyhook.cpp /Foobj\
 if errorlevel 1 goto fail
 
 cl /nologo /c /O2 /MT /Iinclude include\safetyhook\Zydis.c /Foobj\
 if errorlevel 1 goto fail
 
-link /nologo /DLL /OUT:BrethrenPatch.asi obj\*.obj kernel32.lib user32.lib d3d9.lib
+link /nologo /DLL /OUT:BrethrenPatch.asi obj\*.obj kernel32.lib user32.lib gdi32.lib d3d9.lib
 if errorlevel 1 goto fail
 
 echo Built BrethrenPatch.asi

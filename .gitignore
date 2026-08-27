@@ -5,3 +5,25 @@ obj/
 *.exp
 *.pdb
 *.log
+
+# Local test configs and captures, not for the repo
+BrethrenPatch.*.ini
+BrethrenPatch_*.txt
+BrethrenPatch_*.bin
+general.txt
+system.txt
+
+# Internal research notes - superseded by the README
+DYNAMIC_ENEMY_SCALING_TECHNICAL_OVERVIEW.md
+GEGNER_SPAWN_TEST_DE.md
+INTERNAL_ENEMY_SPAWN_SCALING.md
+INTERN_GEGNER_SPAWN_SCALING.md
+
+# Extracted game data - do not publish
+assets/ds3_debug_assets/
+
+# Unfinished
+proton_bootstrap/
+
+# Four player co-op work, not published yet
+src/coop/

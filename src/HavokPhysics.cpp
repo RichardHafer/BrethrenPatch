@@ -34,10 +34,126 @@ static float TimeScale(float deltaTime)
     return scale < 1.0f ? 1.0f : scale;
 }
 
+// Corpses get stiffer the higher the frame rate, in the retail game as much as
+// with this patch. The cause is not a wrong formula; every field of the solver
+// setup is correctly tied to the frame time, measured across 6 to 77 FPS. It is
+// the step count: the solver runs four substeps per FRAME. At 30 FPS that is 120
+// substeps per second, at 144 FPS it is 576. Each substep corrects part of a
+// joint's positional error, so four times as many per second leaves joints four
+// times closer to rigid. The game is tuned for 30 x 4.
+//
+// So keep the substeps per SECOND constant instead of per frame. The total time
+// stepped per frame does not change, only how finely it is divided.
+constexpr float kSubstepsPerSecond = 120.0f;
+
+// Field offsets in the step info structure, established by disassembling the two
+// places that fill it (0x008C00C9 and 0x008C1CB4):
+//   +0x010  gravity premultiplied by the substep duration (4 floats)
+//   +0x10C  substep duration          = fraction * deltaTime
+//   +0x110  substeps per second       = count / deltaTime
+//   +0x114  substep count             (integer)
+//   +0x120  substep fraction          = 1 / count
+namespace step
+{
+    constexpr unsigned gravity = 0x010 / 4;
+    constexpr unsigned duration = 0x10C / 4;
+    constexpr unsigned rate = 0x110 / 4;
+    constexpr unsigned count = 0x114 / 4;
+    constexpr unsigned fraction = 0x120 / 4;
+}
+
+static int WantedSubsteps(float deltaTime, int current)
+{
+    if (!(deltaTime > 0.0f) || current < 1)
+        return current;
+
+    int wanted = (int)(kSubstepsPerSecond * deltaTime + 0.5f);
+    if (wanted < 1)
+        wanted = 1;
+    if (wanted > current)
+        wanted = current;      // never ask for more work than the game wanted
+
+    return wanted;
+}
+
 static int __fastcall SolverInit_Hook(float* self, int, float* a2, float* a3)
 {
     g.frameTimeScale = TimeScale(a3[2]);
-    return gSolverInit.thiscall<int>(self, a2, a3);
+
+    // Rewriting the step info before the original runs means it derives every
+    // field of the solver info from the corrected values by itself, instead of us
+    // having to reproduce all seven formulas.
+    if (cfg::ragdollSubsteps && a2 && a3)
+    {
+        const float deltaTime = a3[2];
+        int* counts = reinterpret_cast<int*>(a2);
+
+        const int current = counts[step::count];
+        const int wanted = WantedSubsteps(deltaTime, current);
+
+        if (wanted != current && wanted >= 1 && current >= 1)
+        {
+            // Gravity was already premultiplied by the old substep duration a few
+            // instructions before this call. Each substep now spans more time, so
+            // that vector has to grow by the same ratio or the world falls slowly.
+            const float ratio = (float)current / (float)wanted;
+            for (unsigned i = 0; i < 4; ++i)
+                a2[step::gravity + i] *= ratio;
+
+            counts[step::count] = wanted;
+            a2[step::duration] = deltaTime / (float)wanted;
+            a2[step::rate] = (float)wanted / deltaTime;
+            a2[step::fraction] = 1.0f / (float)wanted;
+
+            static long reported = 0;
+            if (++reported <= 4)
+                Log("substeps: %d -> %d at %.1f FPS (%.0f per second)",
+                    current, wanted, 1.0f / deltaTime, wanted / deltaTime);
+        }
+    }
+
+    const int result = gSolverInit.thiscall<int>(self, a2, a3);
+
+    // Report the filled structure whenever the frame time changes materially, so
+    // one session at two frame rates shows which fields follow the frame rate and
+    // which are fixed. Bounded, because this runs every frame.
+    if (cfg::solverDiagnostics && self && a2)
+    {
+        static float lastDt = 0.0f;
+        static long lines = 0;
+
+        const float dt = self[3];
+        const bool changed = lastDt <= 0.0f || dt <= 0.0f ||
+                             dt < lastDt * 0.8f || dt > lastDt * 1.25f;
+
+        if (changed && lines < 8)
+        {
+            lastDt = dt;
+            ++lines;
+
+            Log("solver dt %.7f (%.1f FPS)", dt, dt > 0.0f ? 1.0f / dt : 0.0f);
+            Log("  filled  %.7f %.7f %.7f %.7f | %.7f %.7f %.7f %.7f",
+                self[0], self[1], self[2], self[3], self[4], self[5], self[6], self[7]);
+            Log("          %.7f %.7f %.7f %.7f | %.7f %.7f %.7f %.7f",
+                self[8], self[9], self[10], self[11], self[12], self[13], self[14], self[15]);
+            Log("  tuning  10C %.7f  110 %.7f  11C %.7f  120 %.7f  54 %.7f  5C %.7f",
+                a2[0x10C / 4], a2[0x110 / 4], a2[0x11C / 4], a2[0x120 / 4],
+                a2[0x54 / 4], a2[0x5C / 4]);
+            Log("  dt/4 %.7f   4/dt %.7f   1/240 %.7f",
+                dt / 4.0f, dt > 0.0f ? 4.0f / dt : 0.0f, 1.0f / 240.0f);
+
+            // 0x114 and 0x118 are integers sitting between the substep duration
+            // and the 0.25 substep fraction, which is where a step count belongs.
+            const int* asInt = (const int*)a2;
+            Log("  ints    114 %d  118 %d  124 %d",
+                asInt[0x114 / 4], asInt[0x118 / 4], asInt[0x124 / 4]);
+            Log("  around  100 %.7f  104 %.7f  108 %.7f  128 %.7f  12C %.7f",
+                a2[0x100 / 4], a2[0x104 / 4], a2[0x108 / 4],
+                a2[0x128 / 4], a2[0x12C / 4]);
+        }
+    }
+
+    return result;
 }
 
 static void __cdecl ContactJacobian_Hook(__m128* a1, float* c, bool a3, __m128** a4)
@@ -57,6 +173,37 @@ static void __cdecl ContactJacobian_Hook(__m128* a1, float* c, bool a3, __m128**
 
 static void __cdecl Angular1D_Hook(__m128* a1, float* c, __m128** a3)
 {
+    // This one provably runs: it is part of the working physics fix. Ragdoll joint
+    // limits are solved as 1D angular constraints, so if a corpse feels stiffer at
+    // a high frame rate, something in this block should differ between frame
+    // rates. Logging it beats guessing at code that turns out never to execute.
+    if (cfg::solverDiagnostics)
+    {
+        static long lines = 0;
+        static LARGE_INTEGER last{};
+
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+
+        LARGE_INTEGER freq;
+        QueryPerformanceFrequency(&freq);
+
+        const double since = last.QuadPart
+            ? double(now.QuadPart - last.QuadPart) / double(freq.QuadPart)
+            : 1.0;
+
+        if (since > 0.5 && lines < 24)
+        {
+            last = now;
+            ++lines;
+            Log("angular1D at %.0f FPS: %.5f %.5f %.5f %.5f | %.5f %.5f %.5f %.5f",
+                g.frameTimeScale * 30.0f,
+                c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]);
+            Log("                       %.5f %.5f %.5f %.5f | %.5f %.5f %.5f %.5f",
+                c[8], c[9], c[10], c[11], c[12], c[13], c[14], c[15]);
+        }
+    }
+
     const float rhs = c[7];
     c[7] /= g.frameTimeScale;
     gAngular1D.call<void>(a1, c, a3);
