@@ -44,7 +44,7 @@ failed check goes in `BrethrenPatch.log` instead of being applied blindly.
 
 ## Install
 
-**[Download BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch.zip)**
+**[Download BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_1.zip)**
 
 Extract into the game folder, next to `deadspace3.exe`. That is it.
 
