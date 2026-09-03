@@ -79,3 +79,14 @@ SOFTWARE.
 SDL3 is distributed under the zlib license. The vendored headers retain the
 original license notice. The release package includes the official 32-bit
 SDL3 runtime.
+
+## Wine and Proton DirectInput
+
+The Proton release package contains a 32-bit Wine `dinput8.dll`, renamed to
+`dinput8Hooked.dll`. Wine is licensed under the GNU Lesser General Public
+License version 2.1. Valve's Proton distribution license and the corresponding
+source repositories are available here:
+
+- <https://github.com/ValveSoftware/Proton/blob/proton_11.0/dist.LICENSE>
+- <https://github.com/ValveSoftware/Proton>
+- <https://github.com/ValveSoftware/wine>

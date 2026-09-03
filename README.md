@@ -48,9 +48,65 @@ left untouched. Enable `DebugLogging` when you need the result of those checks.
 
 ## Install
 
-**[Download BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_2.zip)**
+### Windows
 
-Extract into the game folder, next to `deadspace3.exe`. That is it.
+**[Download BrethrenPatch_1_2.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_2.zip)**
+
+Close the game and extract the archive into the Dead Space 3 folder, next to
+`deadspace3.exe`. The installed files should look like this:
+
+```text
+Dead Space 3/
+|-- winmm.dll
+|-- SDL3.dll
+|-- BrethrenPatch.ini
+`-- plugins/
+    `-- BrethrenPatch.asi
+```
+
+### Steam Deck and Proton
+
+**[Download BrethrenPatch_1_2_Proton.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_2_Proton.zip)**
+
+Switch to Desktop Mode, close the game and extract the Proton archive into the
+Dead Space 3 folder. In Steam, use **Properties**, **General**, **Launch
+Options** and enter:
+
+```text
+WINEDLLOVERRIDES="dinput8=n,b" %command%
+```
+
+The Proton installation must look like this:
+
+```text
+Dead Space 3/
+|-- dinput8.dll
+|-- dinput8Hooked.dll
+|-- SDL3.dll
+|-- BrethrenPatch.ini
+`-- plugins/
+    `-- BrethrenPatch.asi
+```
+
+Do not rename `winmm.dll` to `dinput8.dll`. The file named `dinput8.dll` in the
+Proton archive is a separate bootstrap. It loads the patch and forwards the
+game's DirectInput calls to `dinput8Hooked.dll`.
+
+Remove any local `winmm.dll` from the game folder when using the Proton
+package. SDL3 itself imports WinMM, so leaving the Windows ASI loader there can
+cause a black screen or stop the patch from loading.
+
+The bundled `dinput8Hooked.dll` is a 32-bit Wine DirectInput module. If it does
+not work with the Proton version selected in Steam, replace it with the x86
+`dinput8.dll` from that Proton prefix and rename the copy to
+`dinput8Hooked.dll`. It is normally found at:
+
+```text
+steamapps/compatdata/1238060/pfx/drive_c/windows/syswow64/dinput8.dll
+```
+
+Copy the file the symbolic link points to, not the symbolic link itself. Do
+not use the 64-bit copy from `system32`.
 
 `SDL3.dll` must remain beside `deadspace3.exe`. It is a runtime dependency of
 the patch even when SDL controller input is disabled in the INI.
@@ -64,7 +120,9 @@ If the game does not start afterwards, update the
 Logging is off by default. Set `DebugLogging=1` before reproducing a problem,
 then include `BrethrenPatch.log` with the bug report.
 
-Proton and Steam Deck are supported.
+The Proton bootstrap always writes `BrethrenProtonBootstrap.log`. A successful
+start reports that both `dinput8Hooked.dll` and `plugins/BrethrenPatch.asi`
+were loaded. `BrethrenPatch.log` is only created when `DebugLogging=1`.
 
 Do not run this together with the DS3 Debug Menu. It verifies the `.text` hash
 and disables its own bindings when Brethren Patch changes code.
