@@ -48,7 +48,7 @@ left untouched. Enable `DebugLogging` when you need the result of those checks.
 
 ## Install
 
-**[Download BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_1.zip)**
+**[Download BrethrenPatch.zip](https://github.com/RichardHafer/BrethrenPatch/releases/latest/download/BrethrenPatch_1_2.zip)**
 
 Extract into the game folder, next to `deadspace3.exe`. That is it.
 
