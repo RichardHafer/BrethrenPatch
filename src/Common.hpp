@@ -591,6 +591,16 @@ namespace cfg
     // Stops the game from moving its own slider in the Windows volume mixer.
     inline bool keepWindowsVolume = false;
     inline bool volumeDiagnostics = false;
+    inline bool rawMouseInput = false;
+    inline float rawMouseSensitivity = 1.0f;
+    inline bool rawMouseInputDiagnostics = false;
+    inline bool useSdlControllerInput = false;
+    inline bool filterInputDevices = false;
+    inline bool sdlControllerDiagnostics = false;
+    inline bool gyroAiming = false;
+    inline bool gyroAimOnly = true;
+    inline float gyroSensitivity = 1.0f;
+    inline float gyroSmoothing = 0.15f;
     // Publisher/company logo sequence at launch. The retail duration is 9.0
     // seconds; this is a percentage of it, so 0 removes it entirely and 100
     // leaves it alone.
@@ -847,7 +857,7 @@ namespace cfg
     inline bool fourPlayerLobbyOverlay = false;
     // Read-only, temporary probe for the OnlinePlayer -> Blaze user-name path.
     inline bool fourPlayerNameDiagnostics = false;
-    inline bool log = true;
+    inline bool log = false;
 
     // Measurement only, see Diagnostics.cpp.
     inline bool tkDiagnostics = false;
@@ -910,21 +920,13 @@ inline bool gLogReady = false;
 inline char gLogPath[MAX_PATH]{};
 inline FILE* gLogFile = nullptr;
 
-// The log handle is opened once and kept.  Reopening per line used to cost
-// between half a second and two seconds on a machine whose game folder is
-// watched by a realtime scanner, because every line paid for a full file open
-// and close.  That turned each burst of lines, and game-flow state changes
-// arrive in bursts at lobby and level transitions, into a visible stutter.
-// The line is still flushed immediately, so a crash keeps everything written
-// so far.
-//
-// _fsopen with _SH_DENYWR rather than fopen is essential, not a detail: a held
-// fopen handle locks the file outright, and the log then cannot be read while
-// DS3 is running.  Reading it mid-session is exactly what the end-round work
-// needs, because the interesting state is an endless loading screen with the
-// process still alive.
+// Keep the handle open to avoid stalls during diagnostic bursts. _SH_DENYWR
+// still allows the log to be read while the game is running.
 inline void LogInit()
 {
+    if (!cfg::log)
+        return;
+
     GetModuleFileNameA(nullptr, gLogPath, MAX_PATH);
     if (char* slash = strrchr(gLogPath, '\\'))
         *(slash + 1) = 0;
@@ -956,21 +958,8 @@ inline void Log(const char* fmt, ...)
         va_end(args);
 
         fputc('\n', gLogFile);
-        // Do not force a disk write on every line.
-        //
-        // There used to be an fflush per line, inside the critical section, on
-        // whichever thread was running, including the game and render
-        // threads. With diagnostics on the lines arrive in bursts (twelve
-        // null-base hits in the same millisecond) and each one forced a disk
-        // access of hundreds of microseconds or more.
-        //
-        // That stalls the game thread at unpredictable moments, which is what
-        // broke the three-player run: StreamingDoor throttles position updates
-        // by timestamp, and a missed window makes a client look absent.
-        //
-        // Ten times a second at most now. A crash may cost the last hundred
-        // milliseconds, which is the smaller problem. Lines that cannot
-        // tolerate that use LogNow().
+        // Throttle disk writes so diagnostics cannot stall the game thread.
+        // Crash-sensitive messages use LogNow().
         const DWORD now = GetTickCount();
         if (now - gLastFlush >= 100)
         {

@@ -17,6 +17,8 @@ void ApplyClassicModeUnlock();
 void ApplySkipAttractVideo();
 void ApplySkipStartupLogos();
 void ApplyWindowsVolume();
+void ApplyRawMouseInput();
+void ApplyControllerInput();
 void ApplyFourPlayerScalingDiagnostics();
 void ApplyFourPlayerSpawnDiagnostics();
 void ApplyFourPlayerCheckpointGuard();
@@ -50,17 +52,23 @@ static void LoadSettings()
     auto flag = [&](const char* key, bool fallback) {
         return number(key, fallback ? 1 : 0) != 0;
     };
-
-    // The enemy switches are no longer called `FourPlayer...` on the outside.
-    // This is a single player feature and a name with "FourPlayer" in it would
-    // have misled everyone. The old name is still read so existing configs do
-    // not silently fall back to defaults.
-    // Order: new name wins, then old name, then the default.
-    auto numberAlias = [&](const char* neu, const char* alt, int standard) {
-        return number(neu, number(alt, standard));
+    auto real = [&](const char* key, float fallback) {
+        char text[64]{};
+        char defaultText[32]{};
+        std::snprintf(defaultText, sizeof(defaultText), "%.3f", fallback);
+        GetPrivateProfileStringA("BrethrenPatch", key, defaultText,
+                                 text, sizeof(text), ini.c_str());
+        char* end = nullptr;
+        const float value = std::strtof(text, &end);
+        return end != text ? value : fallback;
     };
-    auto flagAlias = [&](const char* neu, const char* alt, bool standard) {
-        return numberAlias(neu, alt, standard ? 1 : 0) != 0;
+
+    // Keep the old FourPlayer keys as aliases for existing configurations.
+    auto numberAlias = [&](const char* key, const char* legacyKey, int fallback) {
+        return number(key, number(legacyKey, fallback));
+    };
+    auto flagAlias = [&](const char* key, const char* legacyKey, bool fallback) {
+        return numberAlias(key, legacyKey, fallback ? 1 : 0) != 0;
     };
 
     // Off by default: it helps, but only about half the time. See the INI.
@@ -74,6 +82,21 @@ static void LoadSettings()
         flagAlias("SkipAttractVideo", "SkipStartupIntro", true);
     cfg::keepWindowsVolume = flag("KeepWindowsVolume", false);
     cfg::volumeDiagnostics = flag("VolumeDiagnostics", true);
+    cfg::rawMouseInput = flag("RawMouseInput", false);
+    cfg::rawMouseSensitivity = real("RawMouseSensitivity", 1.0f);
+    if (cfg::rawMouseSensitivity < 0.05f)
+        cfg::rawMouseSensitivity = 0.05f;
+    if (cfg::rawMouseSensitivity > 20.0f)
+        cfg::rawMouseSensitivity = 20.0f;
+    cfg::rawMouseInputDiagnostics = flag("RawMouseInputDiagnostics", false);
+    cfg::useSdlControllerInput = flag("UseSDLControllerInput", false);
+    cfg::filterInputDevices =
+        flagAlias("FilterInputDevices", "BlockDirectInputDevices", false);
+    cfg::sdlControllerDiagnostics = flag("SDLControllerDiagnostics", false);
+    cfg::gyroAiming = flagAlias("GyroAiming", "GyroEnabled", false);
+    cfg::gyroAimOnly = flag("GyroAimOnly", true);
+    cfg::gyroSensitivity = real("GyroSensitivity", 1.0f);
+    cfg::gyroSmoothing = real("GyroSmoothing", 0.15f);
     cfg::skipStartupLogos = flag("SkipStartupLogos", true);
     const int logoPct = number("StartupLogoPercent", 0);
     cfg::startupLogoPercent = static_cast<unsigned>(
@@ -156,10 +179,11 @@ static void LoadSettings()
     // meant every slider hit the wrong type.
     for (unsigned i = 0; i < cfg::kSpawnTypeCount; ++i)
     {
-        const std::string offen = std::string("EnemyType_") + cfg::kSpawnTypeNames[i];
-        const std::string alt   = std::string("FourPlayerSpawnArt_") + cfg::kSpawnTypeNames[i];
+        const std::string key = std::string("EnemyType_") + cfg::kSpawnTypeNames[i];
+        const std::string legacyKey =
+            std::string("FourPlayerSpawnArt_") + cfg::kSpawnTypeNames[i];
         cfg::fourPlayerSpawnTypePercent[i] = static_cast<unsigned>(
-            numberAlias(offen.c_str(), alt.c_str(), 100));
+            numberAlias(key.c_str(), legacyKey.c_str(), 100));
     }
     // The Director places enemies on top of the authored spawn points, so
     // scaling it belongs to the same feature. It is off until it has had a
@@ -180,7 +204,7 @@ static void LoadSettings()
     cfg::fourPlayerRenderSkipBad = flag("FourPlayerRenderSkipBad", false);
     cfg::fourPlayerLobbyOverlay = flag("FourPlayerLobbyOverlay", false);
     cfg::fourPlayerNameDiagnostics = flag("FourPlayerNameDiagnostics", false);
-    cfg::log              = flag("DebugLogging", true);
+    cfg::log              = flag("DebugLogging", false);
     cfg::tkDiagnostics    = flag("TKDiagnostics", false);
     cfg::solverDiagnostics = flag("SolverDiagnostics", false);
 
@@ -246,8 +270,8 @@ static DWORD WINAPI Init(LPVOID)
     if (!g.module)
         return 0;
 
-    LogInit();
     LoadSettings();
+    LogInit();
 
     Log("BrethrenPatch starting, module %08X", (unsigned)(uintptr_t)g.module);
     Log("havok %d, cpu %d, vsync %d (multiplier %d), ui %d",
@@ -256,6 +280,10 @@ static DWORD WINAPI Init(LPVOID)
     Log("classic coop %d, Classic/NG+ menu unlock %d",
         (int)cfg::classicCoop, (int)cfg::classicModeUnlock);
     Log("attract video skip %d", (int)cfg::skipAttractVideo);
+    Log("input: raw mouse %d (%.2fx), SDL controller %d, device filter %d, gyro %d",
+        (int)cfg::rawMouseInput, cfg::rawMouseSensitivity,
+        (int)cfg::useSdlControllerInput, (int)cfg::filterInputDevices,
+        (int)cfg::gyroAiming);
     Log("four-player diagnostics %d (observation only)", (int)cfg::fourPlayerDiagnostics);
     Log("four-player experimental capacity %d (normal campaign only)",
         (int)cfg::fourPlayerExperimental);
@@ -282,6 +310,7 @@ static DWORD WINAPI Init(LPVOID)
     // Neither of these touches game code, and both have to happen early.
     ApplyHighCoreCpu();
     ApplyVSyncD3D9();
+    ApplyControllerInput();
 
     if (WaitForGameCode())
     {
@@ -294,6 +323,7 @@ static DWORD WINAPI Init(LPVOID)
         ApplySkipAttractVideo();
         ApplySkipStartupLogos();
         ApplyWindowsVolume();
+        ApplyRawMouseInput();
         ApplyClassicModeUnlock();
         // Four-player installs its observation hooks from the untouched retail
         // capacity sequence. ClassicCoop changes one branch in that sequence,

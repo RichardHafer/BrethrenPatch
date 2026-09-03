@@ -126,5 +126,5 @@ void ApplyFourPlayerCheckpointGuard()
     Log("FourPlayerCheckpointGuard: %s. On an empty singleton it only redirects "
         "the pointer (0x005F9BC0) instead of skipping the function, so the event "
         "and its done flag survive, and with them the spawns.",
-        gActionBranch ? "aktiv" : "NICHT installiert");
+        gActionBranch ? "active" : "NOT installed");
 }

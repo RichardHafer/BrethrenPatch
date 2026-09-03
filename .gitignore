@@ -6,6 +6,10 @@ obj/
 *.pdb
 *.log
 
+# SDL3 is a build and runtime dependency.
+!lib/
+!lib/SDL3.lib
+
 # Local test configs and captures, not for the repo
 BrethrenPatch.*.ini
 BrethrenPatch_*.txt

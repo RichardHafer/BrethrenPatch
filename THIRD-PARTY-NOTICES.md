@@ -71,3 +71,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## SDL3
+
+<https://www.libsdl.org/>. Copyright (C) 1997-2026 Sam Lantinga.
+
+SDL3 is distributed under the zlib license. The vendored headers retain the
+original license notice. The release package includes the official 32-bit
+SDL3 runtime.

@@ -1459,7 +1459,7 @@ constexpr uintptr_t kModuleSpan = 0x01700000;
 enum RuntimeClass : uint8_t
 {
     RUNTIME_COMBAT = 0,     // has its own damage handling, so an enemy
-    RUNTIME_NO_DAMAGE,      // leerer Basis-Stub -> Requisite/Trigger
+    RUNTIME_NO_DAMAGE,      // empty base stub, likely a requisite or trigger
     RUNTIME_PLAYER,         // a player
     RUNTIME_UNKNOWN,        // undecidable, treated as blocked
 };
@@ -1499,7 +1499,7 @@ static const char* RuntimeClassName(RuntimeClass rc)
     case RUNTIME_COMBAT:    return "enemy(runtime)";
     case RUNTIME_NO_DAMAGE: return "no damage";
     case RUNTIME_PLAYER:    return "player";
-    default:                return "unklar";
+    default:                return "unclear";
     }
 }
 
@@ -1509,8 +1509,8 @@ static const char* SpawnClassName(uint8_t klass)
     {
     case SPAWN_CLASS_COMBAT:         return "enemy";
     case SPAWN_CLASS_NON_COMBAT:     return "Requisite/Trigger";
-    case SPAWN_CLASS_SCRIPTED_STAGE: return "Boss-Buehne";
-    default:                         return "unbekannt";
+    case SPAWN_CLASS_SCRIPTED_STAGE: return "boss stage";
+    default:                         return "unknown";
     }
 }
 
@@ -2499,10 +2499,10 @@ static void FuncSpawnResult_Hook(safetyhook::Context& ctx)
     // enemies the table lists two as unresolved, both demonstrably real
     // enemies, both permanently blocked. A kill is better evidence than a
     // table with half the coverage.
-    const bool corpusHartesVeto =
+    const bool corpusBlocked =
         corpusTarget && (corpusTarget->klass == SPAWN_CLASS_NON_COMBAT ||
                          corpusTarget->klass == SPAWN_CLASS_SCRIPTED_STAGE);
-    const bool corpusUnklar =
+    const bool corpusUnclear =
         corpusTarget && corpusTarget->klass == SPAWN_CLASS_UNRESOLVED;
     const unsigned typePercent =
         corpusSaysCombat ? ArchetypePercent(corpusTarget->archetype) : 100u;
@@ -2548,8 +2548,8 @@ static void FuncSpawnResult_Hook(safetyhook::Context& ctx)
     if (istHost && cfg::fourPlayerDynamicScriptedSpawnScaling && !modQueuedRetry &&
         (combatTarget || corpusSaysCombat || runtimeSaysCombat ||
          provenDamageTaker || learnedEnemy) &&
-        !corpusHartesVeto &&
-        !(corpusUnklar && !learnedEnemy) &&
+        !corpusBlocked &&
+        !(corpusUnclear && !learnedEnemy) &&
         typePercent > 0 && retryEventReady)
     {
         const unsigned playerCount = LivePlayerCount();
@@ -2615,7 +2615,7 @@ static void FuncSpawnResult_Hook(safetyhook::Context& ctx)
                 popTo = entry.popApplied;
                 break;
             }
-        Log("EnemySpawns: maxSpawn angehoben %d -> %d, "
+        Log("EnemySpawns: maxSpawn raised %d -> %d, "
             "popThreshold %d -> %d (attributes=%08X)",
             maxOriginal, raisedMax, popFrom, popTo ? popTo : popFrom,
             static_cast<unsigned>(attributes));
@@ -2634,10 +2634,10 @@ static void FuncSpawnResult_Hook(safetyhook::Context& ctx)
     // buffer and be missing exactly when someone looks.
     (line <= 8 ? LogNow : Log)(
         "EnemySpawns: [%s/%uSp] #%ld FuncSpawn=%08X spawned=%08X target=%08X-%08X-%08X-%08X "
-        "combat=%s korpus=%s art=%s artPct=%u laufzeit=%s vtable=%08X slot=%08X %s countBefore=%u max=%d group=%08X "
+        "combat=%s corpus=%s type=%s typePct=%u runtime=%s vtable=%08X slot=%08X %s countBefore=%u max=%d group=%08X "
         "options=%08X popThreshold=%d attrs=%08X maxNow=%d event=%08X retry=%08X/%08X/%08X retryEventReady=%u "
         "retryEnabled=%u queued=%u pending=%u modRetry=%u scheduled=%u",
-        hostAnswer == 1 ? "HOST" : hostAnswer == 0 ? "CLIENT" : "OHNE-SITZUNG",
+        hostAnswer == 1 ? "HOST" : hostAnswer == 0 ? "CLIENT" : "NO-SESSION",
         LivePlayerCount(),
         line, static_cast<unsigned>(spawner), static_cast<unsigned>(spawned),
         guid0, guid1, guid2, guid3,
@@ -2647,13 +2647,13 @@ static void FuncSpawnResult_Hook(safetyhook::Context& ctx)
         typePercent,
         RuntimeClassName(runtimeClass), static_cast<unsigned>(runtimeVtable),
         static_cast<unsigned>(runtimeSlot),
-        corpusHartesVeto ? "GESPERRT(Korpus)"
-            : (corpusUnklar && !learnedEnemy) ? "GESPERRT(Korpus unklar)"
-            : (corpusSaysCombat && typePercent == 0) ? "GESPERRT(INI-Art=0)"
+        corpusBlocked ? "BLOCKED(corpus)"
+            : (corpusUnclear && !learnedEnemy) ? "BLOCKED(unclear corpus)"
+            : (corpusSaysCombat && typePercent == 0) ? "BLOCKED(INI type=0)"
             : (!combatTarget && !corpusSaysCombat && !runtimeSaysCombat &&
-               !provenDamageTaker && !learnedEnemy) ? "GESPERRT(unbelegt)"
+               !provenDamageTaker && !learnedEnemy) ? "BLOCKED(unproven)"
             : learnedEnemy ? "allowed(self-damaged)"
-            : provenDamageTaker ? "erlaubt(Schadensbeleg)" : "erlaubt",
+            : provenDamageTaker ? "allowed(damage evidence)" : "allowed",
         spawnedBefore, maxSpawn, group, options, popThreshold,
         static_cast<unsigned>(attributes), raisedMax, triggerMessage,
         retryMessage, retryData0, retryData1, retryEventReady,
@@ -2863,7 +2863,7 @@ void ApplyFourPlayerSpawnDiagnostics()
         {
             const unsigned pct = cfg::fourPlayerSpawnTypePercent[i];
             if (pct != 100)
-                Log("FourPlayerSpawns:   Art '%s' auf %u%%%s",
+                Log("FourPlayerSpawns:   type '%s' at %u%%%s",
                     kSpawnArchetypes[i], pct, pct == 0 ? " (nie skalieren)" : "");
         }
     }
